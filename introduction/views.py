@@ -175,7 +175,7 @@ def sql_lab(request):
 
         try:
             user = authenticate(request, username=username, password=password)
-            print(user)
+
 
             if user:
                 messages.success(request, f"Logged in as {user.username}")
@@ -189,7 +189,7 @@ def sql_lab(request):
         except Exception as e:
             messages.error(request, "An error occurred during login")
 
-            print(f"Login error: {str(e)}")
+            logger.info(f"Login error: {str(e)}")
 
         return redirect('sql_lab')
 
@@ -477,12 +477,34 @@ def bau(request):
         return render(request,"Lab/BrokenAuth/bau.html")
     else:
         return redirect('login')
+
 def bau_lab(request):
     if request.user.is_authenticated:
         if request.method=="GET":
             return render(request,"Lab/BrokenAuth/bau_lab.html")
         else:
-            return render(request, 'Lab/BrokenAuth/bau_lab.html', {"wrongpass":"yes"})
+            username = request.POST.get('name', '').strip()
+            password = request.POST.get('pass', '').strip()
+
+            if not username or not password:
+                messages.error(request, "Both username and password are required.",)
+                return render(request,"Lab/BrokenAuth/bau_lab.html")
+
+
+            try:
+                user = authenticate(request, username=username, password=password)
+
+
+                if user:
+                    messages.success(request, f"Logged in as {user.username}")
+                    return render(request, 'Lab/BrokenAuth/bau_lab.html', {"user1": user})
+                else:
+                    messages.error(request, "User not found")
+            except Exception as e:
+                messages.error(request, "An error occurred during login")
+                logger.info(f"Login error: {str(e)}")
+
+            return render(request, 'Lab/BrokenAuth/bau_lab.html')
     else:
         return redirect('login')
 
