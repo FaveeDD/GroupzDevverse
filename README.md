@@ -71,7 +71,6 @@ This repository contains our security-enhanced version of PyGoat, an intentional
 - ✅ Automated vulnerability scanning in CI/CD
 - ✅ Secrets management with environment variables
 - ✅ Resource constraints and health checks
-- ✅ Centralized logging and monitoring
 - ✅ Zero-downtime deployment capability
 
 ## CI/CD Pipeline
@@ -83,12 +82,6 @@ Our GitHub Actions workflow includes:
 4. Docker image building and pushing
 5. Kubernetes deployment
 
-## Monitoring and Logging
-
-- Structured JSON logging
-- Prometheus metrics integration
-- Grafana dashboards for visualization
-- Alert configuration for critical events
 
 ## Known Limitations
 
@@ -96,6 +89,7 @@ Our GitHub Actions workflow includes:
 2. Advanced auto-scaling not implemented within time constraints
 3. Service mesh integration pending for enhanced security
 4. Some static analysis tools may report false positives due to intentional vulnerabilities
+5. some security issues exists due to time constraints
 
 ## Demo Video
 
@@ -103,7 +97,7 @@ Our GitHub Actions workflow includes:
 - Original vulnerabilities and fixes
 - CI/CD pipeline execution
 - Deployment process
-- Monitoring dashboard
+
 
 ## Architecture Diagram
 
@@ -113,8 +107,7 @@ Our GitHub Actions workflow includes:
 [Django Application (Gunicorn)]
         |
 [PostgreSQL Database]
-        |
-[Redis Cache] (if implemented)
+
 ```
 
 ## Security Improvements Summary
