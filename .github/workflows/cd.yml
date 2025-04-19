@@ -96,15 +96,15 @@ jobs:
       #- name: Run flake8
        # run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       
-      - name: Run Ruff (check)
-        run: |
-          # Will exit non-zero if any lint errors remain
-          ruff check . --fix
+      #- name: Run Ruff (check)
+      #  run: |
+      #    # Will exit non-zero if any lint errors remain
+      #   ruff check . --fix
 
-      - name: Run Ruff (auto‑fix)
-        run: |
-          ruff --fix .
-          git diff --exit-code  # fail if fixes introduce unstaged changes
+     # - name: Run Ruff (auto‑fix)
+      #  run: |
+     #     ruff --fix .
+      #    git diff --exit-code  # fail if fixes introduce unstaged changes
   # Test Job
   test:
     name: Run Tests

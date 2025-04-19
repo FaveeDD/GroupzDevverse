@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-# Message tags for Bootstrap
 from django.contrib.messages import constants as messages
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
