@@ -96,17 +96,31 @@ if DEBUG:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+
 else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'postgres',
+            'NAME': env('DB_NAME'),
             'USER': env('DB_USER'),
             'PASSWORD': env('DB_PWD'),
             'HOST': env('DB_HOST'),
             'PORT': env('DB_PORT'),
         }
     }
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE    = True
+    SECURE_SSL_REDIRECT   = True
+    SECURE_HSTS_SECONDS   = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD  = True
+    SECURE_BROWSER_XSS_FILTER   = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Password validation
@@ -184,3 +198,5 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SECRET_COOKIE_KEY = env('SECRET_COOKIE_KEY')
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
+
+
