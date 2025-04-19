@@ -17,6 +17,11 @@
     </div>
     <div id="ssti-inner-div2">
         <h3>Add Blog</h3>
+        {% for message in error %}
+        <div class="alert alert-danger">
+            {{ message }}
+        </div>
+        {% endfor %}
         <form method="POST" class="ssti-form">
             {% csrf_token %} 
             <textarea id="ssti_blog" name="blog" placeholder="your blogs goes here" style="background:#f4f4f924;overflow: auto"></textarea>

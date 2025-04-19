@@ -20,6 +20,7 @@ from xml.sax.handler import feature_external_ges
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.core.exceptions import SuspiciousOperation
 from django.http import HttpResponse
 from django.template.exceptions import TemplateDoesNotExist
 import jwt
@@ -34,15 +35,17 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.template import loader
 from django.template.loader import render_to_string
+from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image, ImageMath
 from requests.structures import CaseInsensitiveDict
-
+import logging
 from .forms import NewUserForm
 from .models import (FAANG, AF_admin, AF_session_id, Blogs, CF_user, authLogin,
                      comments, info, login, otp, sql_lab_table, tickits)
 from .utility import customHash, filter_blog
 
+logger = logging.getLogger(__name__)
 #*****************************************Lab Requirements****************************************************#
 
 #*****************************************Login and Registration****************************************************#
@@ -985,32 +988,77 @@ def ssti(request):
     else:
         return redirect('login')
 
-def ssti_lab(request):
-    if request.user.is_authenticated:
-        if request.method=="GET":
-            users_blogs = Blogs.objects.filter(author=request.user)
-            return render(request,"Lab_2021/A3_Injection/ssti_lab.html", {"blogs":users_blogs})
-        elif request.method=="POST":
-            blog = request.POST["blog"]
-            id = str(uuid.uuid4()).split('-')[-1]
+def sanitize_blog_content(content):
+    """
+    Sanitizes blog content to prevent SSTI and XSS attacks
+    """
+    # Remove potentially dangerous template tags
+    forbidden_patterns = [
+        '{%', '{{', '}}', '%}',
+        'import ', 'eval(', 'exec(',
+        'subprocess', 'os.system', 'pickle',
+        'SELECT', 'INSERT', 'DELETE', '*', 'UPDATE'
+    ]
 
-            blog = filter_blog(blog)
+    for pattern in forbidden_patterns:
+        if pattern in content:
+            raise SuspiciousOperation(f"Forbidden pattern detected: {pattern}")
+
+
+    return escape(content)
+
+@login_required
+def ssti_lab(request):
+    if request.method == "GET":
+        # Safe query using Django ORM (no SQL injection risk)
+        users_blogs = Blogs.objects.filter(author=request.user)
+        return render(request, "Lab_2021/A3_Injection/ssti_lab.html", {"blogs": users_blogs})
+
+    elif request.method == "POST":
+        try:
+            blog_content = request.POST.get("blog", "")
+
+
+            if not blog_content.strip():
+                raise SuspiciousOperation("Blog content cannot be empty")
+
+
+            try:
+                sanitized_content = sanitize_blog_content(blog_content)
+            except SuspiciousOperation as e:
+                logger.info(f"Security violation: {str(e)}")
+                return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                              {"error": "Invalid input detected"}, status=400)
+
+            blog_id = str(uuid.uuid4()).split('-')[-1]
+
+
+            blog = filter_blog(sanitized_content)
             prepend_code = "{% extends 'introduction/base.html' %}\
-                {% block content %}{% block title %}\
-                <title>SSTI-Blogs</title>\
-                {% endblock %}"
-            
+                            {% block content %}{% block title %}\
+                            <title>SSTI-Blogs</title>\
+                            {% endblock %}"
+
             blog = prepend_code + blog + "{% endblock %}"
-            new_blog = Blogs.objects.create(author = request.user, blog_id = id)
-            new_blog.save() 
+            new_blog = Blogs.objects.create(author = request.user, blog_id =blog_id)
+            new_blog.save()
             dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, f"templates/Lab_2021/A3_Injection/Blogs/{id}.html")
-            file = open(filename, "w+") 
+            filename = os.path.join(dirname, f"templates/Lab_2021/A3_Injection/Blogs/{blog_id}.html")
+            file = open(filename, "w+")
             file.write(blog)
             file.close()
-            return redirect(f'blog/{id}')
-    else:
-        return redirect('login')
+            return redirect(f'blog/{blog_id}')
+
+        except SuspiciousOperation as e:
+
+            logger.info(f"Security violation: {str(e)}")
+            return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                          {"error": "Invalid input detected"}, status=400)
+
+        except Exception as e:
+            logger.info(f"Error creating blog: {str(e)}")
+            return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                          {"error": "An error occurred"}, status=500)
 
 
 def ssti_view_blog(request,blog_id):
