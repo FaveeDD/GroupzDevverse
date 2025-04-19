@@ -70,7 +70,7 @@ ROOT_URLCONF = 'pygoat.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -198,5 +198,13 @@ SOCIALACCOUNT_PROVIDERS = {
 
 SECRET_COOKIE_KEY = env('SECRET_COOKIE_KEY')
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
+
+EMAIL_HOST_USER = env('MAIL_FROM')
+EMAIL_HOST_PASSWORD = env('MAIL_PASSWORD')
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = env('MAIL_SERVER')
+EMAIL_PORT = 465
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = True
 
 

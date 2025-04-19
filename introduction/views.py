@@ -34,11 +34,12 @@ from django.core import serializers
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.template import loader
-from django.template.loader import render_to_string
+from django.template.loader import render_to_string, get_template
 from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image, ImageMath
 from requests.structures import CaseInsensitiveDict
+from django.core.mail import EmailMessage
 import logging
 from .forms import NewUserForm
 from .models import (FAANG, AF_admin, AF_session_id, Blogs, CF_user, authLogin,
@@ -518,8 +519,19 @@ def Otp(request):
         email=request.GET.get('email')
         otpN=randint(100,999)
         if email and otpN:
-            if email=="admin@pygoat.com":
-                otp.objects.filter(id=2).update(otp=otpN)
+            if email=="kodiugos@gmail.com":
+                message = get_template('Lab/BrokenAuth/sent_otp.html').render(context={"otp":otpN})
+                mail = EmailMessage(
+                    subject='This is your OTP',
+                    body=message,
+                    from_email=settings.EMAIL_HOST_USER,
+                    to=[email],
+                    reply_to=[settings.EMAIL_HOST_USER],
+                )
+                mail.content_subtype = "html"
+                mail.send()
+
+                otp.objects.create(email=email, otp=otpN)
                 html = render(request, "Lab/BrokenAuth/otp.html", {"otp":"Sent To Admin Mail ID"})
                 html.set_cookie("email", email)
                 return html
