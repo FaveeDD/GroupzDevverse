@@ -1,21 +1,50 @@
-version: '3'
+version: '3.8'
 
 services:
   web:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      - DEBUG=0
+      - CREATE_SUPERUSER=${CREATE_SUPERUSER:-0}
+      - CREATE_DEMO_USERS=1
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-demo_password_123!}
+      - DB_HOST=db
+      - DB_NAME=sensitive_data
+      - DB_USER=django
+      - DB_PASSWORD=${DB_PASSWORD}
     volumes:
-      - .:/app
-    command: >
-      sh -c "python manage.py makemigrations dataexposure &&
-             python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-    # hey dont forget to rebuild if u change requirements!!
-    # fixed db issues - make sure migrations run before server starts!!
-    # if still broken try: docker-compose down && docker-compose up --build
-    
-    # NOTE TO SELF: try on different port if 8000 is taken
-    # also need to implement persistant volume for db
-    # ports:
-    #   - "8001:8000"  # alternate port
+      - ./staticfiles:/app/staticfiles
+      - ./static:/app/static
+      - ./media:/app/media
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s  # Increased for DB initialization
+    restart: unless-stopped
+
+  db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_DB=sensitive_data
+      - POSTGRES_USER=django
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U django"]
+      interval: 5s
+      timeout: 5s
+      retries: 10  # Increased retries
+
+volumes:
+  postgres_data:
