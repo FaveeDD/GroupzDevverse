@@ -5,9 +5,9 @@ name: Flake8
 
 on:
   push:
-    branches: [ master ]
+    branches: [ devopss ]
   pull_request:
-    branches: [ master ]
+    branches: [ devopss ]
 
 jobs:
   build:
