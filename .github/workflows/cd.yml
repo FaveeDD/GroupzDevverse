@@ -1,31 +1,149 @@
-name: CD Pipeline for PyGoat
+name: PyGoat CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - devopss
+    branches: [ devopss ]
   pull_request:
-    branches:
-      - devopss
+    branches: [ devopss ]
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-test:
+  # Security Scanning Job
+  security-scan:
+    name: Security Scanning
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_USER: pygoat_user
-          POSTGRES_PASSWORD: secure_password_2025
-          POSTGRES_DB: pygoat
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
+      - name: Run Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        id: dependency-check
+        with:
+          project: 'PyGoat'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          args: >
+            --enableRetired
+            --enableExperimental
+            --disableBundleAudit
+            --disableRubygems
+            --disableNodeJS
+            --disablePyPkg
+            
+      - name: Upload Dependency Check results
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: reports
+
+      - name: Run Bandit Security Check (Python)
+        run: |
+          pip install bandit
+          bandit -r ./introduction -r ./pygoat -r ./challenge -f json -o bandit-report.json || true
+          bandit -r ./introduction -r ./pygoat -r ./challenge -f html -o bandit-report.html || true
+
+      - name: Upload Bandit reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-reports
+          path: |
+            bandit-report.json
+            bandit-report.html
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Linting Job
+  lint:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort pylint ruff
+
+      - name: Run isort check
+        run: isort --check-only --diff .
+
+      - name: Run black check
+        run: black --check --diff .
+
+      #- name: Run flake8
+       # run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      
+      - name: Run Ruff (check)
+        run: |
+          # Will exit non-zero if any lint errors remain
+          ruff check .
+
+      - name: Run Ruff (auto‑fix)
+        run: |
+          ruff --fix .
+          git diff --exit-code  # fail if fixes introduce unstaged changes
+  # Test Job
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: [security-scan, lint]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-django pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=. --cov-report=xml --cov-report=html
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov/
+
+  # Build and Push Docker Images
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions:
+      contents: read
+      packages: write
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -33,50 +151,78 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker image
-        run: |
-          docker build -t pygoat:latest .
-
-      - name: Run tests
-        run: |
-          docker run --rm \
-            -e DATABASE_HOST=postgres \
-            -e DATABASE_NAME=pygoat \
-            -e DATABASE_USER=pygoat_user \
-            -e DATABASE_PASSWORD=secure_password_2025 \
-            -e DATABASE_PORT=5432 \
-            -e DJANGO_SECRET_KEY=your_django_secret_key_2025 \
-            -e DJANGO_DEBUG=False \
-            --network host \
-            pygoat:latest \
-            python manage.py test
-
-      - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@master
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          image-ref: pygoat:latest
-          format: table
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy:
-    needs: build-and-test
+      - name: Extract metadata for main app
+        id: meta-main
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/main
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+
+      - name: Build and push main app
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-main.outputs.tags }}
+          labels: ${{ steps.meta-main.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push insec_des_lab
+        uses: docker/build-push-action@v4
+        with:
+          context: ./dockerized_labs/insec_des_lab
+          file: ./dockerized_labs/insec_des_lab/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/insec_des_lab:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push sensitive_data_exposure
+        uses: docker/build-push-action@v4
+        with:
+          context: ./dockerized_labs/sensitive_data_exposure
+          file: ./dockerized_labs/sensitive_data_exposure/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}/sensitive_data_exposure:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to staging (For Demo Purposes)
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          version: 'v1.25.0'
 
-      - name: Build and push Docker image
+      - name: Configure kubectl
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/pygoat:latest .
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/pygoat:latest
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Update image tags in k8s manifests
+          sed -i "s|IMAGE_TAG|${{ github.sha }}|g" k8s/deployment.yaml
+          kubectl apply -f k8s/
