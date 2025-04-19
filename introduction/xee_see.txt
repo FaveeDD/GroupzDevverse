@@ -19,21 +19,21 @@ data2=serializers.serialize('xml',comments.objects.all())
         return render(request, 'Lab/BrokenAccess/ba_lab.html', {"SecretKey": 3600})
     elif login.objects.filter(user=name) and login.objects.filter(password=password):
             html=render(request, 'Lab/BrokenAccess/ba_lab.html', {"SecretKey":3600})
-            html.set_cookie("admin",1);
+            html.set_cookie("admin",1, httponly=True);
             return html
     else:
         html = render(request, 'Lab/BrokenAccess/ba_lab.html', )
-        html.set_cookie("admin", 0);
+        html.set_cookie("admin", 0, httponly=True);
         return html
 """if login.objects.filter(user=name) and login.objects.filter(password=password):
             html=render(request, 'Lab/BrokenAccess/ba_lab.html', {"SecretKey":3600})
-            html.set_cookie("admin",1);
+            html.set_cookie("admin",1, httponly=True);
             return html
     elif request.COOKIES.get('admin')==1:
             return render(request,'Lab/BrokenAccess/ba_lab.html',{"SecretKey":3600})
     else :
             html=render(request, 'Lab/BrokenAccess/ba_lab.html',)
-            html.set_cookie("admin",0);
+            html.set_cookie("admin",0, httponly=True);
             return html """
 
 
@@ -41,7 +41,7 @@ data2=serializers.serialize('xml',comments.objects.all())
         return render(request, 'Lab/BrokenAccess/ba_lab.html', {"SecretKey": 3600})
     else:
         html=render(request, 'Lab/BrokenAccess/ba_lab.html')
-        html.set_cookie('ID',"1");
+        html.set_cookie('ID',"1", httponly=True);
         return html
 
 
