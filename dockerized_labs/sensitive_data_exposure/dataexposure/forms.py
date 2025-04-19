@@ -5,6 +5,14 @@ class UserLoginForm(forms.Form):
     username = forms.CharField(max_length=150)
     password = forms.CharField(widget=forms.PasswordInput)
 
+    def clean_username(self):
+        data = self.cleaned_data['username']
+        return data.strip()  # Remove leading/trailing whitespace
+
 class UserRegisterForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
-        fields = ['username', 'password1', 'password2']
+        fields = ['username', 'password', 'password2']
+
+    def clean_username(self):
+        data = self.cleaned_data['username']
+        return data.strip() 
