@@ -44,16 +44,28 @@ from .utility import customHash, filter_blog
 #*****************************************Login and Registration****************************************************#
 
 def register(request):
-	if request.method == "POST":
-		form = NewUserForm(request.POST)
-		if form.is_valid():
-			user = form.save()
-			login(request, user)
-			messages.success(request, "Registration successful." )
-			return redirect('/')
-		messages.error(request, "Unsuccessful registration. Invalid information.")
-	form = NewUserForm()
-	return render (request=request, template_name="registration/register.html", context={"register_form":form})
+    if request.method == "POST":
+        form = NewUserForm(request.POST)
+        if form.is_valid():
+            try:
+                user = form.save()
+                login(request, user)
+                messages.success(request, "Registration successful.")
+                return redirect('/')
+            except Exception as e:
+                messages.error(request, f"Registration failed: {str(e)}")
+        else:
+
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, f"Error: {error}")
+                    else:
+                        messages.error(request, f"Error in {field}: {error}")
+    else:
+        form = NewUserForm()
+
+    return render(request=request, template_name="registration/register.html", context={"register_form": form})
 
 # def register(request):
 #     if request.method=="POST":
@@ -609,22 +621,38 @@ def a10(request):
         return render(request,"Lab/A10/a10.html")
     else:
         return redirect('login')
+
+@authentication_decorator
 def a10_lab(request):
-    if request.user.is_authenticated:
-        if request.method=="GET":
 
-            return render(request,"Lab/A10/a10_lab.html")
-        else:
+    ip_address = get_client_ip(request)
+    now = datetime.datetime.now()
 
-            user=request.POST.get("name")
-            password=request.POST.get("pass")
-            if login.objects.filter(user=user,password=password):
-                return render(request,"Lab/A10/a10_lab.html",{"name":user})
-            else:
-                return render(request, "Lab/A10/a10_lab.html", {"error": " Wrong username or Password"})
+    if request.method == "GET":
+
+        logging.info(f"{now}:{ip_address}:page_access")
+        return render(request, "Lab/A10/a10_lab2.html")
+
+    elif request.method == "POST":
+        username = request.POST.get("name")
+        password = request.POST.get("pass")
+
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+
+            login(request, user)
+
+            if ip_address != '127.0.0.1':
+                logging.warning(f"{now}:{ip_address}:{username}:non_local_login")
+
+            logging.info(f"{now}:{ip_address}:{username}:login_success")
+            return render(request, "Lab/A10/a10_lab2.html", {"name": username})
 
     else:
         return redirect('login')
+
 
 def debug(request):
     response = render(request,'Lab/A10/debug.log')
@@ -636,35 +664,52 @@ logging.basicConfig(level=logging.DEBUG,filename='app.log')
 
 @authentication_decorator
 def a10_lab2(request):
+    """
+    View for handling A10 Lab 2 functionality with proper authentication
+    and security practices.
+    """
+    # Get client IP address once, reuse throughout
+    ip_address = get_client_ip(request)
     now = datetime.datetime.now()
+
     if request.method == "GET":
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
 
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
+        logging.info(f"{now}:{ip_address}:page_access")
+        return render(request, "Lab/A10/a10_lab2.html")
+
+    elif request.method == "POST":
+        username = request.POST.get("name")
+        password = request.POST.get("pass")
+
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+
+            login(request, user)
+
+
+            if ip_address != '127.0.0.1':
+                logging.warning(f"{now}:{ip_address}:{username}:non_local_login")
+
+            logging.info(f"{now}:{ip_address}:{username}:login_success")
+            return render(request, "Lab/A10/a10_lab2.html", {"name": username})
         else:
-            ip = request.META.get('REMOTE_ADDR')
-        logging.info(f"{now}:{ip}")
-        return render (request,"Lab/A10/a10_lab2.html")
+
+            logging.error(f"{now}:{ip_address}:{username}:login_failure")
+            return render(request, "Lab/A10/a10_lab2.html", {"error": "Invalid credentials"})
+
+def get_client_ip(request):
+    """
+    Extract client IP address from request, handling proxy forwarding.
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        # Get the first IP if multiple are provided
+        ip = x_forwarded_for.split(',')[0].strip()
     else:
-        user=request.POST.get("name")
-        password=request.POST.get("pass")
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-
-        if login.objects.filter(user=user,password=password):
-            if ip != '127.0.0.1':
-                logging.warning(f"{now}:{ip}:{user}")
-            logging.info(f"{now}:{ip}:{user}")
-            return render(request,"Lab/A10/a10_lab2.html",{"name":user})
-        else:
-            logging.error(f"{now}:{ip}:{user}")
-            return render(request, "Lab/A10/a10_lab2.html", {"error": " Wrong username or Password"})
-        
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 
 #*********************************************************A11*************************************************#
