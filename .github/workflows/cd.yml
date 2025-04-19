@@ -99,9 +99,9 @@ jobs:
           isort --check-only --diff .
         continue-on-error: true  # Don't fail but show issues
 
-      - name: Lint code with flake8
-        run: |
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      #- name: Lint code with flake8
+       # run: |
+       #S   flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
   # Test Job
   test:
