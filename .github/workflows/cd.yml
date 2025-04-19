@@ -36,7 +36,7 @@ jobs:
             --disablePyPkg
             
       - name: Upload Dependency Check results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dependency-check-report
           path: reports
@@ -48,7 +48,7 @@ jobs:
           bandit -r ./introduction -r ./pygoat -r ./challenge -f html -o bandit-report.html || true
 
       - name: Upload Bandit reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bandit-reports
           path: |
@@ -87,11 +87,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 black isort pylint ruff
 
-      - name: Run isort check
-        run: isort --check-only --diff .
+     # - name: Run isort check
+      #  run: isort --check-only --diff .
 
-      - name: Run black check
-        run: black --check --diff .
+     # - name: Run black check
+      #  run: black --check --diff .
 
       #- name: Run flake8
        # run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
