@@ -17,7 +17,9 @@ from random import randint
 from xml.dom.pulldom import START_ELEMENT, parseString
 from xml.sax import make_parser
 from xml.sax.handler import feature_external_ges
-
+from django.conf import settings
+from django.http import HttpResponse
+from django.template.exceptions import TemplateDoesNotExist
 import jwt
 import requests
 import yaml
@@ -655,9 +657,12 @@ def a10_lab(request):
 
 
 def debug(request):
-    response = render(request,'Lab/A10/debug.log')
-    response['Content-Type'] =  'text/plain'
-    return response
+    try:
+        response = render(request,'Lab/A10/debug.log')
+        response['Content-Type'] =  'text/plain'
+    except TemplateDoesNotExist:
+        response = render(request, 'Lab/A10/error_page.html')
+        return response
 
 # Logging basic configuration
 logging.basicConfig(level=logging.DEBUG,filename='app.log')
