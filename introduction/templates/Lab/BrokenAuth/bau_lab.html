@@ -20,9 +20,10 @@
 </div>
 
 <div class="container">
-    {% if wrongpass %}
-    <h4>Wrong Password Try Using Login With OTP</h4>
-    {% endif %}
+    {% for message in messages %}
+
+        {{ message }}
+    {% endfor %}
 
 
 </div>

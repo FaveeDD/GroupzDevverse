@@ -46,6 +46,9 @@ class otp(models.Model):
     otp = models.IntegerField(validators=[MaxValueValidator(300)])
 
 
+    def __str__(self):
+        return self.email
+
 class tickits(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
