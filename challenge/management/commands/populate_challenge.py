@@ -16,7 +16,7 @@ class Command(BaseCommand):
             for challenge in data:
                 try:
                     Challenge.objects.create(**challenge).save()
-                except Exception
+                except Exception:
                     pass
         except FileNotFoundError:
             raise CommandError("File not found: {}".format(filename))
