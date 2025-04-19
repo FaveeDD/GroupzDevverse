@@ -1,0 +1,6 @@
+[lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]  # If you want to ignore long lines, or remove this to fix them
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Example: Ignore unused imports in __init__.py

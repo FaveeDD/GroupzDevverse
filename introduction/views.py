@@ -18,6 +18,9 @@ from xml.dom.pulldom import START_ELEMENT, parseString
 from xml.sax import make_parser
 from xml.sax.handler import feature_external_ges
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.core.exceptions import SuspiciousOperation
 from django.http import HttpResponse
 from django.template.exceptions import TemplateDoesNotExist
 import jwt
@@ -31,16 +34,19 @@ from django.core import serializers
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.template import loader
-from django.template.loader import render_to_string
+from django.template.loader import render_to_string, get_template
+from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
 from PIL import Image, ImageMath
 from requests.structures import CaseInsensitiveDict
-
+from django.core.mail import EmailMessage
+import logging
 from .forms import NewUserForm
 from .models import (FAANG, AF_admin, AF_session_id, Blogs, CF_user, authLogin,
                      comments, info, login, otp, sql_lab_table, tickits)
 from .utility import customHash, filter_blog
 
+logger = logging.getLogger(__name__)
 #*****************************************Lab Requirements****************************************************#
 
 #*****************************************Login and Registration****************************************************#
@@ -157,49 +163,38 @@ def sql(request):
     else:
         return redirect('login')
 
+@login_required
 def sql_lab(request):
-    if request.user.is_authenticated:
+    if request.method == 'POST':
+        username = request.POST.get('name', '').strip()
+        password = request.POST.get('pass', '').strip()
 
-        name=request.POST.get('name')
+        if not username or not password:
+            messages.error(request, "Both username and password are required.")
+            return redirect('sql_lab')
 
-        password=request.POST.get('pass')
 
-        if name:
+        try:
+            user = authenticate(request, username=username, password=password)
 
-            if login.objects.filter(user=name):
 
-                sql_query = "SELECT * FROM introduction_login WHERE user='"+name+"'AND password='"+password+"'"
-                print(sql_query)
-                try:
-                    print("\nin try\n")
-                    val=login.objects.raw(sql_query)
-                except:
-                    print("\nin except\n")
-                    return render(
-                        request, 
-                        'Lab/SQL/sql_lab.html',
-                        {
-                            "wrongpass":password,
-                            "sql_error":sql_query
-                        })
-
-                if val:
-                    user=val[0].user
-                    return render(request, 'Lab/SQL/sql_lab.html',{"user1":user})
-                else:
-                    return render(
-                        request, 
-                        'Lab/SQL/sql_lab.html',
-                        {
-                            "wrongpass":password,
-                            "sql_error":sql_query
-                        })
+            if user:
+                messages.success(request, f"Logged in as {user.username}")
+                return render(request, 'Lab/SQL/sql_lab.html', {"user1": user})
             else:
-                return render(request, 'Lab/SQL/sql_lab.html',{"no": "User not found"})
-        else:
-            return render(request, 'Lab/SQL/sql_lab.html')
-    else:
-        return redirect('login')
+
+                if User.objects.filter(username=username).exists():
+                    messages.error(request, "Invalid password")
+                else:
+                    messages.error(request, "User not found")
+        except Exception as e:
+            messages.error(request, "An error occurred during login")
+
+            logger.info(f"Login error: {str(e)}")
+
+        return redirect('sql_lab')
+
+    return render(request, 'Lab/SQL/sql_lab.html')
 
 #***************** INSECURE DESERIALIZATION***************************************************************#
 
@@ -483,12 +478,34 @@ def bau(request):
         return render(request,"Lab/BrokenAuth/bau.html")
     else:
         return redirect('login')
+
 def bau_lab(request):
     if request.user.is_authenticated:
         if request.method=="GET":
             return render(request,"Lab/BrokenAuth/bau_lab.html")
         else:
-            return render(request, 'Lab/BrokenAuth/bau_lab.html', {"wrongpass":"yes"})
+            username = request.POST.get('name', '').strip()
+            password = request.POST.get('pass', '').strip()
+
+            if not username or not password:
+                messages.error(request, "Both username and password are required.",)
+                return render(request,"Lab/BrokenAuth/bau_lab.html")
+
+
+            try:
+                user = authenticate(request, username=username, password=password)
+
+
+                if user:
+                    messages.success(request, f"Logged in as {user.username}")
+                    return render(request, 'Lab/BrokenAuth/bau_lab.html', {"user1": user})
+                else:
+                    messages.error(request, "User not found")
+            except Exception as e:
+                messages.error(request, "An error occurred during login")
+                logger.info(f"Login error: {str(e)}")
+
+            return render(request, 'Lab/BrokenAuth/bau_lab.html')
     else:
         return redirect('login')
 
@@ -503,13 +520,24 @@ def Otp(request):
         otpN=randint(100,999)
         if email and otpN:
             if email=="admin@pygoat.com":
-                otp.objects.filter(id=2).update(otp=otpN)
+                message = get_template('Lab/BrokenAuth/sent_otp.html').render(context={"otp":otpN})
+                mail = EmailMessage(
+                    subject='This is your OTP',
+                    body=message,
+                    from_email=settings.EMAIL_HOST_USER,
+                    to=[email],
+                    reply_to=[settings.EMAIL_HOST_USER],
+                )
+                mail.content_subtype = "html"
+                mail.send()
+
+                otp.objects.create(email=email, otp=otpN)
                 html = render(request, "Lab/BrokenAuth/otp.html", {"otp":"Sent To Admin Mail ID"})
                 html.set_cookie("email", email)
                 return html
 
             else:
-                otp.objects.filter(id=1).update(email=email, otp=otpN)
+                otp.objects.filter(email=email, otp=otpN)
                 html=render (request,"Lab/BrokenAuth/otp.html",{"otp":otpN})
                 html.set_cookie("email",email)
                 return html
@@ -896,56 +924,35 @@ def injection(request):
 
 @csrf_exempt
 def injection_sql_lab(request):
-    if request.user.is_authenticated:
+    if request.method == 'POST':
+        username = request.POST.get('name', '').strip()
+        password = request.POST.get('pass', '').strip()
 
-        name=request.POST.get('name')
-        password=request.POST.get('pass')
-        print(name)
-        print(password)
+        if not username or not password:
+            messages.error(request, "Both username and password are required.")
+            return redirect('sql_lab')
 
-        if name:
-            sql_query = "SELECT * FROM introduction_sql_lab_table WHERE id='"+name+"'AND password='"+password+"'"
-
-            sql_instance = sql_lab_table(id="admin", password="65079b006e85a7e798abecb99e47c154")
-            sql_instance.save()
-            sql_instance = sql_lab_table(id="jack", password="jack")
-            sql_instance.save()
-            sql_instance = sql_lab_table(id="slinky", password="b4f945433ea4c369c12741f62a23ccc0")
-            sql_instance.save()
-            sql_instance = sql_lab_table(id="bloke", password="f8d1ce191319ea8f4d1d26e65e130dd5")
-            sql_instance.save()
-
-            print(sql_query)
-
-            try:
-                user = sql_lab_table.objects.raw(sql_query)
-                user = user[0].id
-                print(user)
-
-            except:
-                return render(
-                    request, 
-                    'Lab_2021/A3_Injection/sql_lab.html',
-                    {
-                        "wrongpass":password,
-                        "sql_error":sql_query
-                    })
+        try:
+            user = authenticate(request, username=username, password=password)
+            print(user)
 
             if user:
-                return render(request, 'Lab_2021/A3_Injection/sql_lab.html',{"user1":user})
+                messages.success(request, f"Logged in as {user.username}")
+                return render(request, 'Lab/SQL/sql_lab.html', {"user1": user})
             else:
-                return render(
-                    request, 
-                    'Lab_2021/A3_Injection/sql_lab.html',
-                    {
-                        "wrongpass":password,
-                        "sql_error":sql_query
-                    })
-        else:
-            return render(request, 'Lab_2021/A3_Injection/sql_lab.html')
-    else:
-        return redirect('login')
 
+                if User.objects.filter(username=username).exists():
+                    messages.error(request, "Invalid password")
+                else:
+                    messages.error(request, "User not found")
+        except Exception as e:
+            messages.error(request, "An error occurred during login")
+
+            print(f"Login error: {str(e)}")
+
+        return redirect('sql_lab')
+
+    return render(request, 'Lab/SQL/sql_lab.html')
 
 ##----------------------------------------------------------------------------------------------------------
 ##----------------------------------------------------------------------------------------------------------
@@ -1015,32 +1022,77 @@ def ssti(request):
     else:
         return redirect('login')
 
-def ssti_lab(request):
-    if request.user.is_authenticated:
-        if request.method=="GET":
-            users_blogs = Blogs.objects.filter(author=request.user)
-            return render(request,"Lab_2021/A3_Injection/ssti_lab.html", {"blogs":users_blogs})
-        elif request.method=="POST":
-            blog = request.POST["blog"]
-            id = str(uuid.uuid4()).split('-')[-1]
+def sanitize_blog_content(content):
+    """
+    Sanitizes blog content to prevent SSTI and XSS attacks
+    """
+    # Remove potentially dangerous template tags
+    forbidden_patterns = [
+        '{%', '{{', '}}', '%}',
+        'import ', 'eval(', 'exec(',
+        'subprocess', 'os.system', 'pickle',
+        'SELECT', 'INSERT', 'DELETE', '*', 'UPDATE'
+    ]
 
-            blog = filter_blog(blog)
+    for pattern in forbidden_patterns:
+        if pattern in content:
+            raise SuspiciousOperation(f"Forbidden pattern detected: {pattern}")
+
+
+    return escape(content)
+
+@login_required
+def ssti_lab(request):
+    if request.method == "GET":
+        # Safe query using Django ORM (no SQL injection risk)
+        users_blogs = Blogs.objects.filter(author=request.user)
+        return render(request, "Lab_2021/A3_Injection/ssti_lab.html", {"blogs": users_blogs})
+
+    elif request.method == "POST":
+        try:
+            blog_content = request.POST.get("blog", "")
+
+
+            if not blog_content.strip():
+                raise SuspiciousOperation("Blog content cannot be empty")
+
+
+            try:
+                sanitized_content = sanitize_blog_content(blog_content)
+            except SuspiciousOperation as e:
+                logger.info(f"Security violation: {str(e)}")
+                return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                              {"error": "Invalid input detected"}, status=400)
+
+            blog_id = str(uuid.uuid4()).split('-')[-1]
+
+
+            blog = filter_blog(sanitized_content)
             prepend_code = "{% extends 'introduction/base.html' %}\
-                {% block content %}{% block title %}\
-                <title>SSTI-Blogs</title>\
-                {% endblock %}"
-            
+                            {% block content %}{% block title %}\
+                            <title>SSTI-Blogs</title>\
+                            {% endblock %}"
+
             blog = prepend_code + blog + "{% endblock %}"
-            new_blog = Blogs.objects.create(author = request.user, blog_id = id)
-            new_blog.save() 
+            new_blog = Blogs.objects.create(author = request.user, blog_id =blog_id)
+            new_blog.save()
             dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, f"templates/Lab_2021/A3_Injection/Blogs/{id}.html")
-            file = open(filename, "w+") 
+            filename = os.path.join(dirname, f"templates/Lab_2021/A3_Injection/Blogs/{blog_id}.html")
+            file = open(filename, "w+")
             file.write(blog)
             file.close()
-            return redirect(f'blog/{id}')
-    else:
-        return redirect('login')
+            return redirect(f'blog/{blog_id}')
+
+        except SuspiciousOperation as e:
+
+            logger.info(f"Security violation: {str(e)}")
+            return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                          {"error": "Invalid input detected"}, status=400)
+
+        except Exception as e:
+            logger.info(f"Error creating blog: {str(e)}")
+            return render(request, "Lab_2021/A3_Injection/ssti_lab.html",
+                          {"error": "An error occurred"}, status=500)
 
 
 def ssti_view_blog(request,blog_id):

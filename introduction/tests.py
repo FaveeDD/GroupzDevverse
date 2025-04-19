@@ -1,3 +1,6 @@
 from django.test import TestCase
 
-# Create your tests here.
+class CodeCheckerTests(TestCase):
+    def test_code_checker(self):
+        # Your test logic here
+        self.assertTrue(True)
