@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+# Message tags for Bootstrap
+from django.contrib.messages import constants as messages
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -95,8 +97,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Crispy Forms
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
-# Message tags for Bootstrap
-from django.contrib.messages import constants as messages
 
 MESSAGE_TAGS = {
     messages.DEBUG: "secondary",

@@ -25,7 +25,7 @@ class DoItFast(View):
             return render(
                 request, "challenge.html", {"chal": chal, "user_chal": user_chal}
             )
-        except:
+        except Exception:
             return render(request, "challenge.html", {"chal": chal, "user_chal": None})
 
     def post(self, request, challenge):
@@ -49,11 +49,11 @@ class DoItFast(View):
                     }
                 )
             user_chall_exists = True
-        except:
+        except Exception:
             pass
 
         port = get_free_port(8000, 8100)
-        if port == None:
+        if port is None:
             return JsonResponse(
                 {"message": "failed", "status": "500", "endpoint": "None"}
             )
