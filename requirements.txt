@@ -17,7 +17,7 @@ gunicorn==23.0.0
 idna==3.4
 mccabe==0.6.1
 oauthlib==3.2.2
-Pillow==9.4.0
+Pillow
 psycopg2==2.9.3
 pycodestyle==2.7.0
 pycparser==2.21
@@ -38,4 +38,4 @@ urllib3==1.26.9
 Werkzeug==2.1.2
 whitenoise==6.2.0
 zipp==3.8.0
-Pillow==9.0.0 --prefer-binary
+
