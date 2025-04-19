@@ -1,5 +1,7 @@
 import json
+
 from django.core.management.base import BaseCommand, CommandError
+
 from challenge.models import Challenge
 
 
@@ -18,5 +20,3 @@ class Command(BaseCommand):
                     pass
         except FileNotFoundError:
             raise CommandError("File not found: {}".format(filename))
-
-
