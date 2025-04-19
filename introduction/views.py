@@ -519,7 +519,7 @@ def Otp(request):
         email=request.GET.get('email')
         otpN=randint(100,999)
         if email and otpN:
-            if email=="kodiugos@gmail.com":
+            if email=="admin@pygoat.com":
                 message = get_template('Lab/BrokenAuth/sent_otp.html').render(context={"otp":otpN})
                 mail = EmailMessage(
                     subject='This is your OTP',
@@ -537,7 +537,7 @@ def Otp(request):
                 return html
 
             else:
-                otp.objects.filter(id=1).update(email=email, otp=otpN)
+                otp.objects.filter(email=email, otp=otpN)
                 html=render (request,"Lab/BrokenAuth/otp.html",{"otp":otpN})
                 html.set_cookie("email",email)
                 return html
