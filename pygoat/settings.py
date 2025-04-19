@@ -61,6 +61,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'pygoat.middleware.ContentSecurityPolicyMiddleware',
+    'pygoat.middleware.HSTSHeaderMiddleware',
+    'pygoat.middleware.XContentTypeOptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'pygoat.urls'
